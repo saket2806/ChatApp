@@ -5,7 +5,7 @@
 @inject SemanticSearch Search
 @implements IDisposable
 
-<PageTitle>Chat</PageTitle>
+<PageTitle>Rag Based Chat</PageTitle>
 
 <ChatHeader OnNewChat="@ResetConversationAsync" />
 
@@ -55,28 +55,37 @@
 
     private async Task AddUserMessageAsync(ChatMessage userMessage)
     {
-        CancelAnyCurrentResponse();
-
-        // Add the user message to the conversation
-        messages.Add(userMessage);
-        chatSuggestions?.Clear();
-        await chatInput!.FocusAsync();
-
-        // Stream and display a new response from the IChatClient
-        var responseText = new TextContent("");
-        currentResponseMessage = new ChatMessage(ChatRole.Assistant, [responseText]);
-        currentResponseCancellation = new();
-        await foreach (var update in ChatClient.GetStreamingResponseAsync([.. messages], chatOptions, currentResponseCancellation.Token))
+        try
         {
-            messages.AddMessages(update, filter: c => c is not TextContent);
-            responseText.Text += update.Text;
-            ChatMessageItem.NotifyChanged(currentResponseMessage);
-        }
+            CancelAnyCurrentResponse();
 
-        // Store the final response in the conversation, and begin getting suggestions
-        messages.Add(currentResponseMessage!);
-        currentResponseMessage = null;
-        chatSuggestions?.Update(messages);
+            // Add the user message to the conversation
+            messages.Add(userMessage);
+            chatSuggestions?.Clear();
+            await chatInput!.FocusAsync();
+
+            // Stream and display a new response from the IChatClient
+            var responseText = new TextContent("");
+            currentResponseMessage = new ChatMessage(ChatRole.Assistant, [responseText]);
+            currentResponseCancellation = new();
+            await foreach (var update in ChatClient.GetStreamingResponseAsync([.. messages], chatOptions, currentResponseCancellation.Token))
+            {
+                messages.AddMessages(update, filter: c => c is not TextContent);
+                responseText.Text += update.Text;
+                ChatMessageItem.NotifyChanged(currentResponseMessage);
+            }
+
+            // Store the final response in the conversation, and begin getting suggestions
+            messages.Add(currentResponseMessage!);
+            currentResponseMessage = null;
+            chatSuggestions?.Update(messages);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error occurred while processing message: {ex.Message}");
+            throw;
+        }
+        
     }
 
     private void CancelAnyCurrentResponse()
